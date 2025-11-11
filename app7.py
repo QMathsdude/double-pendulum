@@ -12,6 +12,7 @@ from utils import position_bob1, velocity_bob1, position_bob2, velocity_bob2, si
 from matplotlib.pyplot import rcParams
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from matplotlib.animation import FuncAnimation
 
 class DoublePendulumApp(tb.Frame):
     def __init__(self, root):
@@ -51,6 +52,7 @@ class DoublePendulumApp(tb.Frame):
         self.dt = 0.01
         self.time_max = 30.0
         self.running = False
+        self.currently_animating = False
         self.after_id = None
 
         # store slider widgets so enable/disable is robust
@@ -158,7 +160,7 @@ class DoublePendulumApp(tb.Frame):
         self.fig2 = Figure(figsize=(5, 5))
         self.ax2 = self.fig2.add_subplot(111)
         self.ax2.set_title(r"Angles of Pendulum, $θ(\degree)$ against $t(s)$", fontsize=12)
-        self.ax2.set_xlim(-0.5, self.time_max+1)
+        self.ax2.set_xlim(-0.5, self.time_max+0.5)
         self.ax2.set_ylim(-360, 360)
         self.ax2.set_aspect('auto', adjustable='box')
         self.ax2.grid(ls=':', color='gray', alpha=0.7)
@@ -308,7 +310,6 @@ class DoublePendulumApp(tb.Frame):
                     ):
                         self.update_label(name, var)
 
-
     def clear_active(self):
         if self.active_button:
             name = self.active_button
@@ -346,6 +347,7 @@ class DoublePendulumApp(tb.Frame):
         self.labels[name].config(text=f"{name}: {var.get():.2f}")
 
     # ---------- Playback controls ----------
+    
     def start_time(self):
         """Start or resume the animation"""
         if not self.data_ready:
@@ -358,6 +360,7 @@ class DoublePendulumApp(tb.Frame):
             self.time = 0.0
             self.time_bar["value"] = 0
             self.time_label.configure(text=f"Time Elapsed: {self.time:.2f}s")
+            self.currently_animating = False
 
         if not self.running:
             self.running = True
@@ -366,11 +369,13 @@ class DoublePendulumApp(tb.Frame):
             self.set_default_state("disabled")
             self.set_gravity_state(False)
             self.animate_next_frame()
+            self.start_animation()
 
     def stop_time(self):
         """Pause the animation"""
         if self.running:
             self.running = False
+            self.anim.pause()
             if self.after_id:
                 self.after_cancel(self.after_id)
                 self.after_id = None
@@ -403,7 +408,7 @@ class DoublePendulumApp(tb.Frame):
         self.trail1.set_data([], [])
         self.trail2.set_data([], [])
         self.canvas1.draw_idle()
-
+        
         self.angle1.set_data([], [])
         self.angle2.set_data([], [])
         self.canvas2.draw_idle()
@@ -414,48 +419,6 @@ class DoublePendulumApp(tb.Frame):
         self.set_gravity_state(True)
 
         print("Simulation reset.")
-
-    def animate_next_frame(self):
-        """Manual per-frame animation using Tk after()"""
-        # Stops animation if not running
-        if not self.running:
-            return
-
-        # Draws next frame
-        i = self.frame_index # Trail index
-        if self.frame_index < self.total_frames:
-            x1, y1 = self.x1_arr[i], self.y1_arr[i]
-            x2, y2 = self.x2_arr[i], self.y2_arr[i]
-
-            # Update double pendulum
-            self.bob1.set_data([0, x1], [0, y1])
-            self.bob2.set_data([x1, x2], [y1, y2])
-            self.trail1.set_data(self.x1_arr[:i],self.y1_arr[:i])
-            self.trail2.set_data(self.x2_arr[:i],self.y2_arr[:i])
-            self.canvas1.draw_idle()
-            
-            # Update angle vs time plot
-            t_vals = self.t_values[:i]
-            self.angle1.set_data(t_vals, self.θ1_deg_arr[:i])
-            self.angle2.set_data(t_vals, self.θ2_deg_arr[:i])
-            self.canvas2.draw_idle()
-
-            # update time
-            self.time = float(self.t_values[i])
-            self.time_bar["value"] = self.time
-            self.time_label.configure(text=f"Time Elapsed: {self.time:.2f}s")
-
-            self.frame_index += 1
-            self.after_id = self.after(int(self.dt * 1000), self.animate_next_frame)
-        else:
-            # finished
-            self.running = False
-            self.after_id = None
-            self.enable_sliders()
-            self.set_calculate_state("normal")
-            self.set_default_state("normal") 
-            self.set_gravity_state(True)
-            print("Animation finished.")
 
     def disable_sliders(self):
         """Disable all sliders."""
@@ -491,6 +454,7 @@ class DoublePendulumApp(tb.Frame):
             self.gravity_meter.configure(interactive=state)
 
     # ---------- Calculation ----------
+    
     def calculate_states(self):
         """Compute full trajectories and store arrays — no animation starts here."""
         print("Calculate pressed. Computing states...")
@@ -507,8 +471,18 @@ class DoublePendulumApp(tb.Frame):
             self.time_max, self.dt,
             0.1 * self.gravity.get()
         )
+        # Bookkeeping
+        self.total_frames = len(self.t_values)
+        self.frame_index = 0
+        self.time = 0.0
+        
+        try: # set the progress bar maximum to final time
+            self.time_bar["maximum"] = float(self.t_values[-1])
+        except Exception:
+            self.time_bar["maximum"] = self.time_max
+        self.time_bar["value"] = 0
 
-        # unpack
+        # Unpack all values into arrays
         self.θ1_arr, self.θ2_arr = self.results[:, 0], self.results[:, 1]
         self.θ1_deg_arr, self.θ2_deg_arr = np.degrees(self.θ1_arr), np.degrees(self.θ2_arr)
         self.ω1_arr, self.ω2_arr = self.results[:, 2], self.results[:, 3]
@@ -517,18 +491,17 @@ class DoublePendulumApp(tb.Frame):
         self.vx1_arr, self.vy1_arr = velocity_bob1(self.θ1_arr, self.ω1_arr, self.l1_bob1.get())
         self.vx2_arr, self.vy2_arr = velocity_bob2(self.vx1_arr, self.vy1_arr, self.θ2_arr, self.ω2_arr, self.l2_bob1.get())
 
-        # bookkeeping
-        self.total_frames = len(self.t_values)
-        self.frame_index = 0
-        self.time = 0.0
-        # set the progress bar maximum to final time
-        try:
-            self.time_bar["maximum"] = float(self.t_values[-1])
-        except Exception:
-            self.time_bar["maximum"] = self.time_max
-        self.time_bar["value"] = 0
+        # Create large arrays for animation
+        # self.x1_arr_anim = 
+        self.θ1_deg_arr_anim = []
+        self.θ2_deg_arr_anim = []
+        self.t_values_anim = []
+        for i in range(self.total_frames):
+            self.θ1_deg_arr_anim.append(self.θ1_deg_arr[:i+1])
+            self.θ2_deg_arr_anim.append(self.θ2_deg_arr[:i+1])
+            self.t_values_anim.append(self.t_values[:i+1])
 
-        # mark ready and draw first frame so user sees result immediately
+        # Mark Ready (indication to user), by drawing only first frame
         self.data_ready = True
         if self.total_frames > 0:
             # Double pendulum
@@ -537,19 +510,110 @@ class DoublePendulumApp(tb.Frame):
             limit1 = self.l1_bob1.get() + self.l2_bob1.get() + 0.5
             self.ax1.set_xlim(-limit1, limit1)
             self.ax1.set_ylim(-limit1, limit1)
-
-            
         else:
             self.bob1.set_data([], [])
             self.bob2.set_data([], [])
-            self.angle1.set_data([], [])
-            self.angle2.set_data([], [])
-            
         self.canvas1.draw_idle()
         self.canvas2.draw_idle()
 
         print(f"Gravity {self.gravity.get():.2f} m/s²")
         print(f"Calculated {self.total_frames} frames. Ready to start.")
+        
+    # --- Animation ---
+    def start_animation(self):
+        """
+        Create and start the FuncAnimation.
+        """
+        # Stops animation if not running
+        if not self.running:
+            return
+        
+        # Starts the funcanimation
+        if self.frame_index < self.total_frames:
+            if self.currently_animating: self.anim.resume() # Resume if paused
+            else: # Starts new Animation
+                self.currently_animating = True
+                self.anim = FuncAnimation(
+                    self.fig2,
+                    self.update_graph2_animation, # Function to call for each frame
+                    init_func=self.init_graph2_animation, # Function to call at the start
+                    frames=self.total_frames, 
+                    interval=self.dt * 1000, # Milliseconds between frames
+                    blit=True
+                )
+        else:
+            # Finished running
+            self.running = False
+            self.after_id = None
+            self.enable_sliders()
+            self.set_calculate_state("normal")
+            self.set_default_state("normal") 
+            self.set_gravity_state(True)
+            self.currently_animating = False
+            print("Animation finished.")
+            
+    def update_graph2_animation(self, frame):
+        """
+        Update function for the animation.
+        This is called for each new frame.
+        """
+        ang1 = self.θ1_deg_arr_anim[frame]
+        ang2 = self.θ2_deg_arr_anim[frame]
+        t_vals = self.t_values_anim[frame]
+        
+        # Update the line's data
+        self.angle1.set_data(t_vals, ang1)
+        self.angle2.set_data(t_vals, ang2)
+        
+        # Return the artist that has been modified
+        return (self.angle1, self.angle2)
+    
+    def init_graph2_animation(self):
+        """
+        Initialization function for the animation.
+        Sets the line data to empty.
+        """
+        self.angle1.set_data([], [])
+        self.angle2.set_data([], [])
+        return (self.angle1, self.angle2)
+    
+
+    
+    def animate_next_frame(self):
+        """Manual per-frame animation using Tk after()"""
+        # Stops animation if not running
+        if not self.running:
+            return
+
+        # Draws next frame
+        i = self.frame_index # Trail index
+        if self.frame_index < self.total_frames:
+            x1, y1 = self.x1_arr[i], self.y1_arr[i]
+            x2, y2 = self.x2_arr[i], self.y2_arr[i]
+
+            # Update double pendulum
+            self.bob1.set_data([0, x1], [0, y1])
+            self.bob2.set_data([x1, x2], [y1, y2])
+            self.trail1.set_data(self.x1_arr[:i],self.y1_arr[:i])
+            self.trail2.set_data(self.x2_arr[:i],self.y2_arr[:i])
+            self.canvas1.draw_idle()
+
+            # update time
+            self.time = float(self.t_values[i])
+            self.time_bar["value"] = self.time
+            self.time_label.configure(text=f"Time Elapsed: {self.time:.2f}s")
+
+            self.frame_index += 1
+            self.after_id = self.after(int(self.dt * 1000), self.animate_next_frame)
+        else:
+            # finished
+            self.running = False
+            self.after_id = None
+            self.enable_sliders()
+            self.set_calculate_state("normal")
+            self.set_default_state("normal") 
+            self.set_gravity_state(True)
+            print("Animation finished.")
 
 
 if __name__ == "__main__":

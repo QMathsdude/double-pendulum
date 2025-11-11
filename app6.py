@@ -89,7 +89,7 @@ class DoublePendulumApp(tb.Frame):
         header_label = tb.Label(
             header_frame,
             text=f"Double Pendulum Simulation ({self.time_max}s)",
-            font=("Liberation Sans", 24, "bold"),
+            font=("Arial", 24, "bold"),
             bootstyle="info"
         )
         header_label.pack(side=LEFT, padx=(5, 10))
@@ -100,7 +100,7 @@ class DoublePendulumApp(tb.Frame):
             values=themes,
             state="readonly",
             bootstyle="info",
-            font=("Liberation Sans", 10)
+            font=("Arial", 10)
         )
         self.theme_dropdown.pack(side=RIGHT, padx=5)
         self.theme_dropdown.set(self.style.theme.name)
@@ -130,7 +130,7 @@ class DoublePendulumApp(tb.Frame):
         
         # MPL customization
         rcParams['text.usetex'] = False
-        rcParams['font.family'] = ['Liberation Serif', 'serif']
+        rcParams['font.family'] = ['Times New Roman', 'serif']
         rcParams['mathtext.fontset'] = 'cm'
         rcParams['figure.dpi'] = 100
         
@@ -404,9 +404,9 @@ class DoublePendulumApp(tb.Frame):
         self.trail2.set_data([], [])
         self.canvas1.draw_idle()
 
-        self.angle1.set_data([], [])
-        self.angle2.set_data([], [])
-        self.canvas2.draw_idle()
+        # self.angle1.set_data([], [])
+        # self.angle2.set_data([], [])
+        # self.canvas2.draw_idle()
 
         self.enable_sliders()
         self.set_calculate_state("normal")
@@ -435,10 +435,10 @@ class DoublePendulumApp(tb.Frame):
             self.canvas1.draw_idle()
             
             # Update angle vs time plot
-            t_vals = self.t_values[:i]
-            self.angle1.set_data(t_vals, self.θ1_deg_arr[:i])
-            self.angle2.set_data(t_vals, self.θ2_deg_arr[:i])
-            self.canvas2.draw_idle()
+            # t_vals = self.t_values[:i]
+            # self.angle1.set_data(t_vals, self.θ1_deg_arr[:i])
+            # self.angle2.set_data(t_vals, self.θ2_deg_arr[:i])
+            # self.canvas2.draw_idle()
 
             # update time
             self.time = float(self.t_values[i])
@@ -538,15 +538,14 @@ class DoublePendulumApp(tb.Frame):
             self.ax1.set_xlim(-limit1, limit1)
             self.ax1.set_ylim(-limit1, limit1)
 
-            
         else:
             self.bob1.set_data([], [])
             self.bob2.set_data([], [])
-            self.angle1.set_data([], [])
-            self.angle2.set_data([], [])
+            # self.angle1.set_data([], [])
+            # self.angle2.set_data([], [])
             
         self.canvas1.draw_idle()
-        self.canvas2.draw_idle()
+        # self.canvas2.draw_idle()
 
         print(f"Gravity {self.gravity.get():.2f} m/s²")
         print(f"Calculated {self.total_frames} frames. Ready to start.")

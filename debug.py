@@ -1,93 +1,124 @@
-import ttkbootstrap as tb
-from ttkbootstrap.constants import *
-from tkinter import DoubleVar
+import tkinter as tk
+from tkinter import ttk
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 
-class DoublePendulumApp(tb.Frame):
+# --- Main Application Class ---
+class App:
     def __init__(self, root):
-        super().__init__(root)
-        self.pack(fill=BOTH, expand=YES, padx=20, pady=10)
+        """
+        Initialize the main application.
+        """
+        self.root = root
+        self.root.title("Matplotlib Animation in Tkinter")
+        self.root.geometry("800x600")
 
-        # Tkinter style
-        self.style = tb.Style()
+        # Create a frame for the plot
+        plot_frame = ttk.Frame(self.root)
+        plot_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-        # Pendulum parameters
-        self.m1_bob1 = DoubleVar(value=1.0)
-        self.m2_bob1 = DoubleVar(value=1.0)
-        self.l1_bob1 = DoubleVar(value=1.0)
-        self.l2_bob1 = DoubleVar(value=1.0)
-        self.θ1_bob1 = DoubleVar(value=90.0)
-        self.θ2_bob1 = DoubleVar(value=120.0)
-        self.ω1_bob1 = DoubleVar(value=0.0)
-        self.ω2_bob1 = DoubleVar(value=0.0)
+        # --- Matplotlib Setup ---
+        # Create a Figure and an Axes
+        self.fig, self.ax = plt.subplots()
 
-        # --- Layout setup ---
-        self.create_header()
-        self.create_main_area()
-        self.create_controls()
+        # Create the initial line object with empty data
+        # We will update this line object in the animation
+        self.line, = self.ax.plot([], [], 'r-') # 'r-' for a red line
 
-    # -------------------------------------------------------
-    def create_header(self):
-        header_frame = tb.Frame(self)
-        header_frame.pack(fill=X, pady=(0, 10))  # stays at top, independent of grid
+        # Set up the plot limits
+        self.ax.set_xlim(0, 4 * np.pi)
+        self.ax.set_ylim(-1.2, 1.2)
+        self.ax.set_title("Moving Sine Wave")
+        self.ax.set_xlabel("X-axis")
+        self.ax.set_ylabel("Y-axis")
+        self.ax.grid(True)
 
-        header_label = tb.Label(
-            header_frame,
-            text="Double Pendulum Simulation (30s)",
-            font=("Liberation Sans", 24, "bold"),
-            bootstyle="info"
+        # --- Pre-calculate all data ---
+        # Define animation parameters
+        self.num_frames = 200
+        self.num_points = 200
+        self.x_data = np.linspace(0, 4 * np.pi, self.num_points)
+
+        # Create the "completed array" (2D) to store all y-data
+        self.all_y_data = np.zeros((self.num_frames, self.num_points))
+        for i in range(self.num_frames): self.all_y_data[i, :] = np.sin(self.x_data + i * 0.1)
+        
+        # --- Tkinter-Matplotlib Bridge ---
+        self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+        # --- Control Frame ---
+        control_frame = ttk.Frame(self.root)
+        control_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=5)
+
+        # Add a quit button
+        quit_button = ttk.Button(master=control_frame, text="Quit", command=self.quit_app)
+        quit_button.pack(side=tk.RIGHT, padx=10)
+        
+        # Start the animation
+        self.start_animation()
+
+    def init_animation(self):
+        """
+        Initialization function for the animation.
+        Sets the line data to empty.
+        """
+        self.line.set_data([], [])
+        return (self.line,)
+
+    def update_animation(self, frame):
+        """
+        Update function for the animation.
+        This is called for each new frame.
+        """
+        # Calculate new y-data based on the frame number (which acts as a time-step)
+        # y_data = np.sin(self.x_data + frame * 0.1) # <-- We no longer calculate here
+
+        # INSTEAD: We retrieve the pre-calculated data from our "completed array"
+        # The 'frame' argument is used as the index
+        y_data = self.all_y_data[frame, :]
+        
+        # Update the line's data
+        self.line.set_data(self.x_data, y_data)
+        
+        # Return the artist that has been modified
+        return (self.line,)
+
+    def start_animation(self):
+        """
+        Create and start the FuncAnimation.
+        """
+        # We need to store the animation object as an instance variable
+        # so it doesn't get garbage-collected.
+        self.anim = FuncAnimation(
+            self.fig,                # The figure to animate
+            self.update_animation,   # The function to call for each frame
+            init_func=self.init_animation, # The function to call at the start
+            frames=self.num_frames,  # Use the number of frames we calculated
+            interval=20,             # Milliseconds between frames
+            blit=True                # Use blitting for performance
         )
-        header_label.pack(side=LEFT, padx=(5, 10))
 
-        # Theme Dropdown
-        themes = self.style.theme_names()
-        self.theme_dropdown = tb.Combobox(
-            header_frame,
-            values=themes,
-            state="readonly",
-            bootstyle="info",
-            font=("Liberation Sans", 10)
-        )
-        self.theme_dropdown.pack(side=RIGHT, padx=5)
-        self.theme_dropdown.set(self.style.theme.name)
-        self.theme_dropdown.bind("<<ComboboxSelected>>", self.change_theme)
+    def quit_app(self):
+        """
+        Cleanly shut down the application.
+        """
+        # We can stop the animation if we want, but destroying root is enough
+        # if self.anim:
+        #     self.anim.event_source.stop()
+        self.root.quit()
+        self.root.destroy()
 
-    # -------------------------------------------------------
-    def create_main_area(self):
-        """Main grid area for graphs and other content"""
-        self.main_frame = tb.Frame(self)
-        self.main_frame.pack(fill=BOTH, expand=YES)
-
-        # Configure a 3x3 grid inside this frame
-        for i in range(3):
-            self.main_frame.columnconfigure(i, weight=1)
-        for j in range(3):
-            self.main_frame.rowconfigure(j, weight=1)
-
-        # Example placeholder widget
-        tb.Label(
-            self.main_frame,
-            text="Graph area (placeholder)",
-            bootstyle="secondary",
-            anchor="center"
-        ).grid(row=1, column=1, sticky=NSEW, padx=10, pady=10)
-
-    # -------------------------------------------------------
-    def create_controls(self):
-        """Playback controls at the bottom"""
-        playback_frame = tb.Labelframe(self, text="Playback Controls", bootstyle="info")
-        playback_frame.pack(fill=X, pady=(10, 0))
-
-        for text, style in [("Play", "success"), ("Pause", "warning"), ("Stop", "danger")]:
-            btn = tb.Button(playback_frame, text=text, bootstyle=style)
-            btn.pack(side=LEFT, padx=5, pady=5)
-
-    # -------------------------------------------------------
-    def change_theme(self, event=None):
-        new_theme = self.theme_dropdown.get()
-        self.style.theme_use(new_theme)
-
-
+# --- Main execution ---
 if __name__ == "__main__":
-    root = tb.Window("Double Pendulum Simulation (30s)", "morph", resizable=(True, True))
-    DoublePendulumApp(root)
-    root.mainloop()
+    # Set up the main Tkinter window
+    root = tk.Tk()
+    
+    # Create the application instance
+    app = App(root)
+    
+    # Start the Tkinter event loop
+    tk.mainloop()
