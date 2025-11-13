@@ -1,19 +1,14 @@
-from tkinter import VERTICAL, DoubleVar, StringVar
-from tkinter.messagebox import YES
-
+from tkinter import DoubleVar
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
-from ttkbootstrap.dialogs import Messagebox
 
 import numpy as np
-from scipy.linalg import solve
-
-from utils import position_bob1, velocity_bob1, position_bob2, velocity_bob2, simulate_double_pendulum
-
-from matplotlib.pyplot import rcParams
+from matplotlib.pyplot import rcParams, style
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from matplotlib.animation import FuncAnimation
+
+from utils import position_bob1, velocity_bob1, position_bob2, velocity_bob2, simulate_double_pendulum
 
 
 class DoublePendulumApp(tb.Frame):
@@ -46,14 +41,13 @@ class DoublePendulumApp(tb.Frame):
         # Animation & playback state
         self.anim = None
         self.frame_index = 0
-        self.total_frames = 0
+        self.total_frames = 0 
         self.data_ready = False
 
         # Time control
         self.time = 0.0
         self.dt = 0.01
-        self.time_max = 10.0
-        # self.time_max = 30.0
+        self.time_max = 20.0
         self.running = False
         self.anim_in_process = False
         self.after_id = None
@@ -69,11 +63,10 @@ class DoublePendulumApp(tb.Frame):
         self.buttons = {}
         self.button_color = {}
         self.buttons_info = [ # for creating buttons
-            ("Calculate", "info"),
             ("Start", "success"),
             ("Pause", "warning"),
             ("Reset", "danger"),
-            ("Default", "secondary")
+            ("Default", "info")
         ]
 
         # Labels
@@ -85,6 +78,7 @@ class DoublePendulumApp(tb.Frame):
         self.create_graphs()
         self.create_playback()
         self.create_controls()
+        self.update_pendulum_preview()
 
     # ---------- GUI creation ----------
     
@@ -113,6 +107,8 @@ class DoublePendulumApp(tb.Frame):
         self.theme_dropdown.pack(side=RIGHT, padx=5)
         self.theme_dropdown.set(self.style.theme.name)
         self.theme_dropdown.bind("<<ComboboxSelected>>", self.change_theme)
+        
+        tb.Separator(self, orient=HORIZONTAL, bootstyle="info").pack(fill=X, pady=(0, 0))
 
     def create_main(self):
         # Main frame
@@ -125,7 +121,18 @@ class DoublePendulumApp(tb.Frame):
             if j != 1: self.main_frame.rowconfigure(j, weight=0)
             else: self.main_frame.rowconfigure(j, weight=1)
 
-        tb.Separator(self.main_frame, orient=HORIZONTAL, bootstyle="info").grid(row=0, column=0, columnspan=3, sticky=EW)
+        # Description box
+        description_box = tb.Text(
+            self.main_frame,
+            height=2,
+            wrap="word",
+            font=("Liberation Sans", 10, "bold"),
+        )
+        description_box.insert("end",
+            "The dynamics of two pendulums below are derived using Lagrange's equations instead of Newton's laws.\nAdjust the sliders below to set the physical characteristics and initial conditions of the pendulumns. Then, click \"Start\" to simulate the motion."
+        )
+        description_box.configure(state="disabled")  # make it read-only
+        description_box.grid(row=0, column=0, columnspan=3, sticky="ew", padx=10, pady=5)
 
     def create_graphs(self):
         # Creation of graph frame
@@ -137,6 +144,7 @@ class DoublePendulumApp(tb.Frame):
         rcParams['font.family'] = ['Liberation Serif', 'serif']
         rcParams['mathtext.fontset'] = 'cm'
         rcParams['figure.dpi'] = 100
+        style.use('seaborn-v0_8')
         
         self.fig = Figure(figsize=(15, 5))
         self.ax1 = self.fig.add_subplot(131)
@@ -148,26 +156,40 @@ class DoublePendulumApp(tb.Frame):
         self.ax1.set_title(r"Double Pendulum, $y(m)$ against $x(m)$", fontsize=12)
         self.ax1.set_xlim(-limit1, limit1)
         self.ax1.set_ylim(-limit1, limit1)
+        self.ax1.axhline(0, color='black', lw=0.5, ls='--', alpha=0.5)
+        self.ax1.axvline(0, color='black', lw=0.5, ls='--', alpha=0.5)
         self.ax1.set_aspect('equal', adjustable='box')
-        self.ax1.grid(ls=':', color='gray', alpha=0.7)
+        # self.ax1.grid(ls=':', color='gray', alpha=0.7)
+        for spine in self.ax1.spines.values():
+            spine.set_visible(True)
+            spine.set_color('gray')
+            spine.set_linewidth(1.5)
 
-        (self.bob1,) = self.ax1.plot([], [], ms=5, mfc='crimson', mec='crimson', marker='o', ls='--', lw=0.5,color='black', zorder=2)
-        (self.bob2,) = self.ax1.plot([], [], ms=5, mfc='royalblue', mec='royalblue', marker='o', ls='--', lw=0.5, color='green', zorder=1)
+        (self.bob1,) = self.ax1.plot([], [], ms=5, mfc='crimson', mec='crimson', marker='o', ls='--', lw=0.5, color='maroon', zorder=2, label='Bob 1')
+        (self.bob2,) = self.ax1.plot([], [], ms=5, mfc='royalblue', mec='royalblue', marker='o', ls='--', lw=0.5, color='green', zorder=1, label='Bob 2')
         (self.trail1,) = self.ax1.plot([], [], color='crimson', ls="--", lw=0.5, alpha=0.5, zorder=0)
         (self.trail2,) = self.ax1.plot([], [], color='royalblue', ls="--", lw=0.5, alpha=0.5, zorder=0)
+        self.ax1.legend(loc='best', frameon=True, facecolor='white')
         
         # 2. Position (θ°) against time (t) plot
         self.ax2.set_title(r"Angles of Pendulum, $θ(\degree)$ against $t(s)$", fontsize=12)
         self.ax2.set_xlim(0, self.time_max+0.5)
         self.ax2.set_ylim(-360, 360)
+        self.ax2.axhline(0, color='black', lw=0.5, ls='--', alpha=0.5)
+        self.ax2.axvline(0, color='black', lw=0.5, ls='--', alpha=0.5)
 
         # Set aspect ratio to make plot area square
         data_ratio = 720 / (self.time_max + 0.5) # ratio of y against x data ranges
         self.ax2.set_aspect(1.0 / data_ratio) 
-        self.ax2.grid(ls=':', color='gray', alpha=0.7)
+        # self.ax2.grid(ls=':', color='gray', alpha=0.7)
+        for spine in self.ax2.spines.values():
+            spine.set_visible(True)
+            spine.set_color('gray')
+            spine.set_linewidth(1.5)
         
-        (self.angle1,) = self.ax2.plot([], [], ls='-', lw=2, color='crimson')
-        (self.angle2,) = self.ax2.plot([], [], ls='-', lw=2, color='royalblue')
+        (self.angle1,) = self.ax2.plot([], [], ls='-', lw=1.5, color='crimson', label=r'$\theta_1$')
+        (self.angle2,) = self.ax2.plot([], [], ls='-', lw=1.5, color='royalblue', label=r'$\theta_2$')
+        self.ax2.legend(loc='best', frameon=True, facecolor='white')
         
         # 3. Phase Space X
         self.ax3.set_title(r"Phase Space, $v_x(\mathrm{ms}^{-1})$ against $x(m)$", fontsize=12)
@@ -176,11 +198,18 @@ class DoublePendulumApp(tb.Frame):
         limit3 = max(limit3_position, limit3_velocity)
         self.ax3.set_xlim(-limit3*1.1, limit3*1.1)
         self.ax3.set_ylim(-limit3*1.1, limit3*1.1)
+        self.ax3.axhline(0, color='black', lw=0.5, ls='--', alpha=0.5)
+        self.ax3.axvline(0, color='black', lw=0.5, ls='--', alpha=0.5)
         self.ax3.set_aspect('equal', adjustable='box')
-        self.ax3.grid(ls=':', color='gray', alpha=0.7)
+        # self.ax3.grid(ls=':', color='gray', alpha=0.7)
+        for spine in self.ax3.spines.values():
+            spine.set_visible(True)
+            spine.set_color('gray')
+            spine.set_linewidth(1.5)
         
-        (self.phase1,) = self.ax3.plot([], [], ls='-', lw=2, color='crimson')
-        (self.phase2,) = self.ax3.plot([], [], ls='-', lw=2, color='royalblue')
+        (self.phase1,) = self.ax3.plot([], [], ls='-', lw=1, color='crimson', label='Phase 1')
+        (self.phase2,) = self.ax3.plot([], [], ls='-', lw=1, color='royalblue', label='Phase 2')
+        self.ax3.legend(loc='best', frameon=True, facecolor='white')
 
         # Add canvas to tkinter
         self.fig.tight_layout()
@@ -306,7 +335,6 @@ class DoublePendulumApp(tb.Frame):
         self.gravity.set(new_val)
 
     def on_button_click(self, name, color):
-        """Highlights the actively clicked button."""
         if self.active_button and self.active_button in self.buttons:
             prev_name = self.active_button
             prev_color = self.button_color.get(prev_name, "secondary")
@@ -314,8 +342,7 @@ class DoublePendulumApp(tb.Frame):
         self.buttons[name].configure(bootstyle=f"{color}")
         self.active_button = name
 
-        if name == "Calculate": self.calculate_states()
-        elif name == "Start": self.start_time()
+        if name == "Start": self.start_time()
         elif name == "Pause": self.stop_time()
         elif name == "Reset": self.reset_time()
         elif name == "Default":
@@ -328,12 +355,13 @@ class DoublePendulumApp(tb.Frame):
             self.ω1_bob1.set(0.0)
             self.ω2_bob1.set(0.0)
             self.gravity.set(98.1)
-            self.gravity_meter.configure(amountused=98.1) # Manually update some widgets
+            self.gravity_meter.configure(amountused=98.1)
             for name, var in zip(
-                        ["m1 (kg)", "m2 (kg)", "l1 (m)", "l2 (m)", "θ1 (°)", "θ2 (°)", "ω1 (°/s)", "ω2 (°/s)"],
-                        [self.m1_bob1, self.m2_bob1, self.l1_bob1, self.l2_bob1, self.θ1_bob1, self.θ2_bob1, self.ω1_bob1, self.ω2_bob1]
-                    ):
-                        self.update_label(name, var)
+                ["m1 (kg)", "m2 (kg)", "l1 (m)", "l2 (m)", "θ1 (°)", "θ2 (°)", "ω1 (°/s)", "ω2 (°/s)"],
+                [self.m1_bob1, self.m2_bob1, self.l1_bob1, self.l2_bob1, self.θ1_bob1, self.θ2_bob1, self.ω1_bob1, self.ω2_bob1]
+            ):
+                self.update_label(name, var)
+            self.update_pendulum_preview()
 
     def clear_active(self):
         """Clear the active button highlight."""
@@ -352,7 +380,7 @@ class DoublePendulumApp(tb.Frame):
             frame,
             from_=0, to=10.0,
             variable=variable,
-            command=lambda val, n=name, v=variable: self.update_label(n, v)
+            command=lambda val, n=name, v=variable: (self.update_label(n, v), self.update_pendulum_preview())
         )
         scale.grid(row=row, column=1, sticky=EW, padx=(10, 20), pady=2)
         self.scales.append(scale)
@@ -366,7 +394,7 @@ class DoublePendulumApp(tb.Frame):
             frame,
             from_=-180.0, to=180.0,
             variable=variable,
-            command=lambda val, n=name, v=variable: self.update_label(n, v)
+            command=lambda val, n=name, v=variable: (self.update_label(n, v), self.update_pendulum_preview())
         )
         scale.grid(row=row, column=1, sticky=EW, padx=(10, 20), pady=2)
         self.scales.append(scale)
@@ -378,17 +406,12 @@ class DoublePendulumApp(tb.Frame):
     # ---------- Playback controls ----------
     
     def start_time(self):
-        """Start or resume the animation"""
-        # Error check: user has not clicked calculate
-        if not self.data_ready:
-            Messagebox.show_warning(
-                title="Calculation Required",
-                message="Please press Calculate first to generate data.",
-                parent=self  # Reference to main window
-            )
-            return
-
+        """Compute, then start the animation."""
         # If finished running, restart from beginning
+        if self.frame_index >= self.total_frames or not self.data_ready:
+            self.calculate_states()
+
+        # Reset progress/time if needed
         if self.frame_index >= self.total_frames:
             self.frame_index = 0
             self.time = 0.0
@@ -396,14 +419,14 @@ class DoublePendulumApp(tb.Frame):
             self.time_label.configure(text=f"Time Elapsed: {self.time:.2f}s")
             self.anim_in_process = False
 
-        # If not running, start animation and disable buttons and sliders
+        # Start animation if not running
         if not self.running:
             self.running = True
             self.disable_sliders()
-            self.set_calculate_state("disabled")
             self.set_default_state("disabled")
             self.set_gravity_state(False)
             self.start_animation()
+
 
     def stop_time(self):
         """Pause the animation"""
@@ -453,6 +476,9 @@ class DoublePendulumApp(tb.Frame):
         self.phase1.set_data([], [])
         self.phase2.set_data([], [])
         self.canvas.draw_idle()
+        
+        # Draw preview
+        self.update_pendulum_preview()
         
         # Re-enable buttons and sliders
         self.enable_sliders()
@@ -567,8 +593,12 @@ class DoublePendulumApp(tb.Frame):
             self.ax1.set_xlim(-limit1, limit1)
             self.ax1.set_ylim(-limit1, limit1)
             
-            # Position
-            # No need to update, since θ and t are fixed
+            # Position (t is fixed)
+            max_angle = np.max(np.abs(np.concatenate([self.θ1_deg_arr, self.θ2_deg_arr])))
+            buffer = 90.0 # for y-spacing
+            limit2_angle = np.ceil((max_angle + buffer) / 10.0) * 10.0 
+            self.ax2.set_ylim(-limit2_angle, limit2_angle)
+            self.ax2.set_aspect(abs(self.time_max / (2 * limit2_angle)))  # computed aspect ratio
             
             # Phase
             self.ax3.set_title(r"Phase Space, $v_x(\mathrm{ms}^{-1})$ against $x(m)$", fontsize=12)
@@ -594,7 +624,35 @@ class DoublePendulumApp(tb.Frame):
         print(f"Gravity {self.gravity.get():.2f} m/s²")
         print(f"Calculated {self.total_frames} frames. Ready to start.")
         
+    def update_pendulum_preview(self):
+        """Instantly update the pendulum diagram when any slider (θ₁, θ₂, l₁, l₂) moves."""
+        # Get current slider values
+        θ1 = np.radians(self.θ1_bob1.get())
+        θ2 = np.radians(self.θ2_bob1.get())
+        l1 = self.l1_bob1.get()
+        l2 = self.l2_bob1.get()
+
+        # Compute coordinates of bobs
+        x1 = l1 * np.sin(θ1)
+        y1 = -l1 * np.cos(θ1)
+        x2 = x1 + l2 * np.sin(θ2)
+        y2 = y1 - l2 * np.cos(θ2)
+
+        # Update the line objects
+        self.bob1.set_data([0, x1], [0, y1])
+        self.bob2.set_data([x1, x2], [y1, y2])
+
+        # Auto-adjust axis limits to fit both rods
+        limit = l1 + l2 + 0.5
+        self.ax1.set_xlim(-limit, limit)
+        self.ax1.set_ylim(-limit, limit)
+
+        # Refresh canvas without lag
+        self.canvas.draw_idle()
+
+        
     # --- Animation ---
+    
     def start_animation(self):
         """
         Create and start the FuncAnimation.
@@ -626,7 +684,7 @@ class DoublePendulumApp(tb.Frame):
             self.set_calculate_state("normal")
             self.set_default_state("normal") 
             self.set_gravity_state(True)
-            # self.anim.event_source.stop()
+            self.update_pendulum_preview()
             self.anim_in_process = False
             print("Animation finished.")
 
@@ -660,7 +718,7 @@ class DoublePendulumApp(tb.Frame):
         current_time = self.t_values[frame]
         self.time_bar["value"] = current_time
         self.time_label.configure(text=f"Time Elapsed: {current_time:.2f}s")
-        self.time_label.update_idletasks()  # force redraw of UI
+        # self.time_label.update_idletasks()  # force redraw of UI
         
         # Return the artist that has been modified
         return (self.bob1, self.bob2, self.trail1, self.trail2, self.angle1, self.angle2, self.phase1, self.phase2)
@@ -682,6 +740,6 @@ class DoublePendulumApp(tb.Frame):
         return (self.bob1, self.bob2, self.trail1, self.trail2, self.angle1, self.angle2, self.phase1, self.phase2)
 
 if __name__ == "__main__":
-    root = tb.Window("Double Pendulum Simulation (30s)", "morph", resizable=(True, True))
+    root = tb.Window("Double Pendulum Simulation (20s)", "morph", resizable=(True, True))
     DoublePendulumApp(root)
     root.mainloop()

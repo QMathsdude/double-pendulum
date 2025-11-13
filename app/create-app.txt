@@ -1,0 +1,13 @@
+# BASH
+pyinstaller --onefile \
+  --hidden-import numpy._core._exceptions \
+  --hidden-import scipy._cyutility \
+  --hidden-import utils \
+  --hidden-import PIL._tkinter_finder \
+  --hidden-import PIL.ImageTk \
+  --hidden-import PIL.Image \
+  --hidden-import PIL._imaging \
+  --collect-all PIL \
+  app13.py \
+  --exclude PyQt5 \
+  --exclude PySide6
