@@ -1,4 +1,5 @@
 # BASH
+# Actually, with double-p env, do not need all these hidden imports.
 pyinstaller --onefile \
   --hidden-import numpy._core._exceptions \
   --hidden-import scipy._cyutility \
