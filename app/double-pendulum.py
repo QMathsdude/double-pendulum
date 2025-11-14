@@ -159,7 +159,6 @@ class DoublePendulumApp(tb.Frame):
         self.ax1.axhline(0, color='black', lw=0.5, ls='--', alpha=0.5)
         self.ax1.axvline(0, color='black', lw=0.5, ls='--', alpha=0.5)
         self.ax1.set_aspect('equal', adjustable='box')
-        # self.ax1.grid(ls=':', color='gray', alpha=0.7)
         for spine in self.ax1.spines.values():
             spine.set_visible(True)
             spine.set_color('gray')
@@ -181,7 +180,6 @@ class DoublePendulumApp(tb.Frame):
         # Set aspect ratio to make plot area square
         data_ratio = 720 / (self.time_max + 0.5) # ratio of y against x data ranges
         self.ax2.set_aspect(1.0 / data_ratio) 
-        # self.ax2.grid(ls=':', color='gray', alpha=0.7)
         for spine in self.ax2.spines.values():
             spine.set_visible(True)
             spine.set_color('gray')
@@ -201,7 +199,6 @@ class DoublePendulumApp(tb.Frame):
         self.ax3.axhline(0, color='black', lw=0.5, ls='--', alpha=0.5)
         self.ax3.axvline(0, color='black', lw=0.5, ls='--', alpha=0.5)
         self.ax3.set_aspect('equal', adjustable='box')
-        # self.ax3.grid(ls=':', color='gray', alpha=0.7)
         for spine in self.ax3.spines.values():
             spine.set_visible(True)
             spine.set_color('gray')
@@ -212,7 +209,7 @@ class DoublePendulumApp(tb.Frame):
         self.ax3.legend(loc='best', frameon=True, facecolor='white')
 
         # Add canvas to tkinter
-        self.fig.tight_layout()
+        # self.fig.tight_layout() # not good for small resolutions
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
         self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
 
@@ -239,7 +236,8 @@ class DoublePendulumApp(tb.Frame):
             textright="(m/s²)",
             metertype="semi",
             stripethickness=5,
-            metersize=120,
+            # metersize=120,
+            metersize=150,
             amounttotal=200.0,
             amountused=self.gravity.get(),
             amountformat="{:.2f}",
@@ -305,10 +303,10 @@ class DoublePendulumApp(tb.Frame):
         param_frame_1.columnconfigure(0, weight=0)
         param_frame_1.columnconfigure(1, weight=1)
 
-        self.add_param_1(frame=param_frame_1, row=0, name="m1 (kg)", variable=self.m1_bob1)
-        self.add_param_1(frame=param_frame_1, row=1, name="m2 (kg)", variable=self.m2_bob1)
-        self.add_param_1(frame=param_frame_1, row=2, name="l1 (m)", variable=self.l1_bob1)
-        self.add_param_1(frame=param_frame_1, row=3, name="l2 (m)", variable=self.l2_bob1)
+        self.add_param(frame=param_frame_1, row=0, name="m1 (kg)", variable=self.m1_bob1)
+        self.add_param(frame=param_frame_1, row=1, name="m2 (kg)", variable=self.m2_bob1, from_=0, to=10.0)
+        self.add_param(frame=param_frame_1, row=2, name="l1 (m)", variable=self.l1_bob1)
+        self.add_param(frame=param_frame_1, row=3, name="l2 (m)", variable=self.l2_bob1)
 
         # 2. State Vectors for Bob 
         param_frame_2 = tb.Labelframe(inner_control_frame, bootstyle="primary", text="State Vectors")
@@ -317,10 +315,10 @@ class DoublePendulumApp(tb.Frame):
         param_frame_2.columnconfigure(0, weight=0)
         param_frame_2.columnconfigure(1, weight=1)
 
-        self.add_param_2(frame=param_frame_2, row=0, name="θ1 (°)", variable=self.θ1_bob1)
-        self.add_param_2(frame=param_frame_2, row=1, name="θ2 (°)", variable=self.θ2_bob1)
-        self.add_param_2(frame=param_frame_2, row=2, name="ω1 (°/s)", variable=self.ω1_bob1)
-        self.add_param_2(frame=param_frame_2, row=3, name="ω2 (°/s)", variable=self.ω2_bob1)
+        self.add_param(frame=param_frame_2, row=0, name="θ1 (°)", variable=self.θ1_bob1, from_=-180.0, to=180.0)
+        self.add_param(frame=param_frame_2, row=1, name="θ2 (°)", variable=self.θ2_bob1, from_=-180.0, to=180.0)
+        self.add_param(frame=param_frame_2, row=2, name="ω1 (°/s)", variable=self.ω1_bob1, from_=-180.0, to=180.0)
+        self.add_param(frame=param_frame_2, row=3, name="ω2 (°/s)", variable=self.ω2_bob1, from_=-180.0, to=180.0)
 
     # ---------- Helpers ----------
     
@@ -371,28 +369,14 @@ class DoublePendulumApp(tb.Frame):
             self.buttons[name].configure(bootstyle=f"{color}-outline")
             self.active_button = None
 
-    def add_param_1(self, frame, row, name, variable):
+    def add_param(self, frame, row, name, variable, from_=0.01, to=10.0):
         """Add a parameter slider for physical characteristics like mass & length."""
         label = tb.Label(frame, text=f"{name}: {variable.get():.2f}")
         label.grid(row=row, column=0, sticky=W, padx=5, pady=2)
         self.labels[name] = label
         scale = tb.Scale(
             frame,
-            from_=0, to=10.0,
-            variable=variable,
-            command=lambda val, n=name, v=variable: (self.update_label(n, v), self.update_pendulum_preview())
-        )
-        scale.grid(row=row, column=1, sticky=EW, padx=(10, 20), pady=2)
-        self.scales.append(scale)
-
-    def add_param_2(self, frame, row, name, variable):
-        """Add a parameter slider for state vectors, θ & ω."""
-        label = tb.Label(frame, text=f"{name}: {variable.get():.2f}")
-        label.grid(row=row, column=0, sticky=W, padx=5, pady=2)
-        self.labels[name] = label
-        scale = tb.Scale(
-            frame,
-            from_=-180.0, to=180.0,
+            from_=from_, to=to,
             variable=variable,
             command=lambda val, n=name, v=variable: (self.update_label(n, v), self.update_pendulum_preview())
         )
