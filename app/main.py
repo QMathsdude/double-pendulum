@@ -1,7 +1,9 @@
-from tkinter import DoubleVar
 import ttkbootstrap as tb
+from ttkbootstrap import DoubleVar, PhotoImage
 from ttkbootstrap.constants import *
 
+import os
+import sys
 import numpy as np
 from matplotlib.pyplot import rcParams, style
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -9,7 +11,6 @@ from matplotlib.figure import Figure
 from matplotlib.animation import FuncAnimation
 
 from utils import position_bob1, velocity_bob1, position_bob2, velocity_bob2, simulate_double_pendulum
-
 
 class DoublePendulumApp(tb.Frame):
     def __init__(self, root):
@@ -724,6 +725,14 @@ class DoublePendulumApp(tb.Frame):
         return (self.bob1, self.bob2, self.trail1, self.trail2, self.angle1, self.angle2, self.phase1, self.phase2)
 
 if __name__ == "__main__":
+    # Create the main application window
     root = tb.Window("Double Pendulum Simulation (20s)", "morph", resizable=(True, True))
     DoublePendulumApp(root)
+    # Set icon
+    # try: base_path = sys._MEIPASS
+    # except Exception: base_path = os.path.abspath(".")
+    # icon_path = os.path.join(base_path, "logo.png")
+    # try: root.iconphoto(True, PhotoImage(file=icon_path))
+    # except Exception as e: print(f"Icon not found: {e}") 
+    # Start the Tkinter event loop
     root.mainloop()
