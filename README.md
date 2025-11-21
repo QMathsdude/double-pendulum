@@ -2,7 +2,7 @@
 
 The following is a Double Pendulum Simulation made using `Python` and `Ttkbootstrap`. This GUI application allows users to investigate the real-time motion of a double pendulum, while also being able to modify the pendulum's parameters such as the bob(s) mass $m_i$, length of string(s) $\ell_i$, intial displacement(s) $\theta_i$ and initial angular velocities $\omega_i$.
 
-EMBED VIDEO HERE
+https://github.com/user-attachments/assets/838bea28-6822-4cd8-afa5-fa7aab3102c0
 
 ## 🛠️ Introduction
 
