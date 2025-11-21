@@ -1,3 +1,11 @@
+"""
+MIT License
+
+Copyright (c) 2025 Errol Tay
+
+See LICENSE for full license text.
+"""
+
 import numpy as np
 from scipy.linalg import solve
 

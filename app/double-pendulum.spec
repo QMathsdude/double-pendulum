@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['double-pendulum.py'],
     pathex=[],
     binaries=[],
     datas=[('logo.png', '.')],

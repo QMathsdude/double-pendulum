@@ -1,3 +1,11 @@
+"""
+MIT License
+
+Copyright (c) 2025 Errol Tay
+
+See LICENSE for full license text.
+"""
+
 import ttkbootstrap as tb
 from ttkbootstrap import DoubleVar, PhotoImage
 from ttkbootstrap.constants import *
