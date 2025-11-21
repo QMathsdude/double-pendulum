@@ -12,6 +12,7 @@ from ttkbootstrap.constants import *
 
 import os
 import sys
+import platform
 import numpy as np
 from matplotlib.pyplot import rcParams, style
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -80,6 +81,9 @@ class DoublePendulumApp(tb.Frame):
 
         # Labels
         self.labels = {}
+        
+        # Application font
+        self.safe_font = self.get_safe_font()
 
         # Build UI
         self.create_header()
@@ -99,7 +103,7 @@ class DoublePendulumApp(tb.Frame):
         header_label = tb.Label(
             header_frame,
             text=f"Double Pendulum Simulation ({self.time_max}s)",
-            font=("Liberation Sans", 22, "bold"),
+            font=(self.safe_font, 22, "bold"),
             bootstyle="info"
         )
         header_label.pack(side=LEFT, padx=(5, 10))
@@ -111,7 +115,7 @@ class DoublePendulumApp(tb.Frame):
             values=themes,
             state="readonly",
             bootstyle="info",
-            font=("Liberation Sans", 10)
+            font=(self.safe_font, 10)
         )
         self.theme_dropdown.pack(side=RIGHT, padx=5)
         self.theme_dropdown.set(self.style.theme.name)
@@ -135,7 +139,7 @@ class DoublePendulumApp(tb.Frame):
             self.main_frame,
             height=2,
             wrap="word",
-            font=("Liberation Sans", 10, "bold"),
+            font=(self.safe_font, 10, "bold"),
         )
         description_box.insert("end",
             "The dynamics of two pendulums below are derived using Lagrange's equations instead of Newton's laws.\nAdjust the sliders below to set the physical characteristics and initial conditions of the pendulumns. Then, click \"Start\" to simulate the motion."
@@ -150,7 +154,7 @@ class DoublePendulumApp(tb.Frame):
         
         # MPL customization
         rcParams['text.usetex'] = False
-        rcParams['font.family'] = ['Liberation Serif', 'serif']
+        rcParams['font.family'] = ['serif']
         rcParams['mathtext.fontset'] = 'cm'
         rcParams['figure.dpi'] = 100
         style.use('seaborn-v0_8')
@@ -330,6 +334,14 @@ class DoublePendulumApp(tb.Frame):
         self.add_param(frame=param_frame_2, row=3, name="ω2 (°/s)", variable=self.ω2_bob1, from_=-180.0, to=180.0)
 
     # ---------- Helpers ----------
+    
+    def get_safe_font(self):
+        """Return a safe font based on the operating system."""
+        system = platform.system()
+        if system == "Linux": return "Liberation Sans"
+        elif system == "Windows": return "Segoe UI" 
+        elif system == "Darwin": return "Helvetica" # macOS
+        else: return "Arial"  # Universal fallback
     
     def change_theme(self, event=None):
         """Change the theme of the application."""
